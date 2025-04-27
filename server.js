@@ -19,6 +19,17 @@ const io = new Server(server, {
 });
 
 const PORT = 5000;
+const path = require("path");
+
+// Serve static files (for React app or other frontend assets)
+app.use(express.static(path.join(__dirname, "frontend/build")));
+
+// Catch-all route to send the index.html (useful for single-page apps)
+// Correct way to define route with parameter
+app.get("/chat/:username", (req, res) => {
+  const { username } = req.params;
+  res.send(`Chat with ${username}`);
+});
 
 // Store online users
 let users = {};
