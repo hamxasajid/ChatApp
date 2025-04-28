@@ -282,7 +282,7 @@
 
 /* Messages container */
 .message-container {
-  height: 60vh;
+  height: 50vh;
   padding: 24px;
   overflow-y: auto;
   border-radius: 8px;

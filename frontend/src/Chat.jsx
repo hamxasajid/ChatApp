@@ -7,7 +7,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./Chat.css";
 
-const socket = io("http://localhost:5000", {
+const socket = io("https://globalconnect.up.railway.app/", {
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
 });
