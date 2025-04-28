@@ -212,7 +212,7 @@ export default function Chat() {
           <div className="modal-container">
             <div className="modal-content">
               <header className="modal-header">
-                <h2 className="modal-title">Welcome to ChatHub</h2>
+                <h2 className="modal-title">Welcome to GupShupCorner</h2>
                 <p className="modal-subtitle">Let's get started</p>
               </header>
 
@@ -272,7 +272,11 @@ export default function Chat() {
           </div>
 
           {/* Messages container */}
-          <div ref={chatBoxRef} className="message-container">
+          <div
+            ref={chatBoxRef}
+            className="message-container"
+            style={{ backgroundColor: "var(--bg)" }}
+          >
             {messages.map((msg, index) => (
               <MessageBubble
                 key={`${index}-${msg.time}`}
@@ -315,12 +319,13 @@ export default function Chat() {
                 <div className="emoji-picker-wrapper">
                   <EmojiPicker
                     onEmojiClick={handleEmojiClick}
-                    width={300}
+                    // width={300}
                     height={350}
                     previewConfig={{ showPreview: false }}
                     searchDisabled={false}
                     skinTonesDisabled
                     lazyLoadEmojis
+                    style={{ backgroundColor: "var(--bgbubble)" }}
                   />
                 </div>
               )}
@@ -371,6 +376,7 @@ function MessageBubble({ msg, userName }) {
     >
       <div className="message-content">
         {msg.username === "System" ? (
+          // System message divider
           <div className="system-message-divider">
             <div className="divider-line"></div>
             <span>System</span>

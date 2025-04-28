@@ -2,12 +2,20 @@
 :root {
   --background: #ffffff;
   --text: #000000;
+  --bgPrimary: #f0f0f0;
+  --bgbubble: #f2f1fc;
+  --darkmsgcolor: #333;
+  --darktimecolor: #ccc;
 }
 
 /* Dark theme */
 .dark {
   --background: #1a1a1a;
   --text: #ffffff;
+  --bg: #171335;
+  --bgbubble: #5a519cc2;
+  --darkmsgcolor: #f2f1fc;
+  --darktimecolor: #ccc;
 }
 
 body {
@@ -16,4 +24,8 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
   overflow-x: hidden;
   font-family: "Poppins", sans-serif;
+}
+
+.epr_-99lr9q {
+  background-color: var(--background) !important;
 }

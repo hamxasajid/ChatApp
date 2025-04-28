@@ -19,15 +19,6 @@ const io = new Server(server, {
 });
 
 const PORT = 5000;
-const path = require("path");
-
-// Serve static files (for React app or other frontend assets)
-app.use(express.static(path.join(__dirname, "frontend/dist")));
-
-app.get("/chat/:username", (req, res) => {
-  const { username } = req.params;
-  res.send(`Chat with ${username}`);
-});
 // Store online users
 let users = {};
 
