@@ -12,6 +12,16 @@ const socket = io("http://localhost:5000", {
   reconnectionDelay: 1000,
 });
 
+// Utility function to generate consistent color from username
+const getUsernameColor = (username) => {
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) {
+    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 70%, 60%)`;
+};
+
 export default function Chat() {
   // State management
   const [message, setMessage] = useState("");
@@ -20,6 +30,9 @@ export default function Chat() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [userName, setUserName] = useState(
     localStorage.getItem("username") || ""
+  );
+  const [displayName, setDisplayName] = useState(
+    localStorage.getItem("displayName") || ""
   );
   const [showNameModal, setShowNameModal] = useState(
     !localStorage.getItem("username")
@@ -79,13 +92,26 @@ export default function Chat() {
     setTypingUser("");
   }, []);
 
+  const handleUsernameAssigned = useCallback(
+    ({ actualUsername, displayUsername }) => {
+      setUserName(actualUsername);
+      setDisplayName(displayUsername);
+      localStorage.setItem("username", actualUsername);
+      localStorage.setItem("displayName", displayUsername);
+      if (actualUsername !== displayUsername) {
+        toast.info(`Your display name is ${displayUsername}`);
+      }
+    },
+    []
+  );
+
   // Effects
   useEffect(() => {
     // Connection status
     socket.on("connect", () => {
       setIsConnected(true);
       if (userName) {
-        socket.emit("new user", userName);
+        socket.emit("new user", { requestedUsername: userName });
       }
     });
 
@@ -97,15 +123,23 @@ export default function Chat() {
     socket.on("chat message", handleNewMessage);
     socket.on("typing", handleTypingEvent);
     socket.on("stop typing", handleStopTypingEvent);
+    socket.on("username assigned", handleUsernameAssigned);
 
     return () => {
       socket.off("chat message", handleNewMessage);
       socket.off("typing", handleTypingEvent);
       socket.off("stop typing", handleStopTypingEvent);
+      socket.off("username assigned", handleUsernameAssigned);
       socket.off("connect");
       socket.off("disconnect");
     };
-  }, [userName, handleNewMessage, handleTypingEvent, handleStopTypingEvent]);
+  }, [
+    userName,
+    handleNewMessage,
+    handleTypingEvent,
+    handleStopTypingEvent,
+    handleUsernameAssigned,
+  ]);
 
   // Emoji picker click outside handler
   useEffect(() => {
@@ -135,7 +169,12 @@ export default function Chat() {
         hour: "2-digit",
         minute: "2-digit",
       });
-      const msg = { username: userName, text: message, time: timestamp };
+      const msg = {
+        username: userName,
+        displayName: displayName || userName,
+        text: message,
+        time: timestamp,
+      };
 
       socket.emit("chat message", msg);
       socket.emit("stop typing");
@@ -145,7 +184,7 @@ export default function Chat() {
 
   const handleTyping = () => {
     if (!typingTimeoutRef.current) {
-      socket.emit("typing", userName);
+      socket.emit("typing", displayName || userName);
     }
 
     clearTimeout(typingTimeoutRef.current);
@@ -166,9 +205,12 @@ export default function Chat() {
   const handleNameSubmit = (e) => {
     e.preventDefault();
     if (userName.trim()) {
-      localStorage.setItem("username", userName);
-      socket.emit("new user", userName);
+      socket.emit("new user", { requestedUsername: userName });
       setShowNameModal(false);
+      // Focus the input after a small delay to ensure it's rendered
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   };
 
@@ -177,10 +219,12 @@ export default function Chat() {
   };
 
   const confirmLeaveChat = () => {
-    socket.emit("user left", userName);
+    socket.emit("user left", { username: userName, displayName });
     localStorage.removeItem("username");
+    localStorage.removeItem("displayName");
     localStorage.removeItem("hasJoined");
     setUserName("");
+    setDisplayName("");
     setMessages([]);
     setShowLeaveModal(false);
     setShowNameModal(true);
@@ -259,7 +303,13 @@ export default function Chat() {
           {/* Chat header */}
           <div className="chat-header">
             <h2 className="chat-title">
-              Welcome, <span className="username-gradient">{userName}</span> 👋
+              Welcome,{" "}
+              <span
+                style={{ color: getUsernameColor(displayName || userName) }}
+              >
+                {displayName || userName}
+              </span>{" "}
+              👋
             </h2>
             <div className="theme-leave">
               <div className="theme-toggle">
@@ -287,7 +337,7 @@ export default function Chat() {
           </div>
 
           {/* Typing indicator */}
-          {typingUser && typingUser !== userName && (
+          {typingUser && typingUser !== (displayName || userName) && (
             <TypingIndicator typingUser={typingUser} />
           )}
 
@@ -303,7 +353,6 @@ export default function Chat() {
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleTyping}
                 onKeyUp={handleStopTyping}
-                // maxLength={500}
                 autoFocus
               />
               <button
@@ -319,7 +368,6 @@ export default function Chat() {
                 <div className="emoji-picker-wrapper">
                   <EmojiPicker
                     onEmojiClick={handleEmojiClick}
-                    // width={300}
                     height={350}
                     previewConfig={{ showPreview: false }}
                     searchDisabled={false}
@@ -366,17 +414,25 @@ export default function Chat() {
   );
 }
 
-// Extracted components for better organization
 function MessageBubble({ msg, userName }) {
+  const displayName = msg.displayName || msg.username;
+  const isCurrentUser = msg.username === userName;
+  const isSystem = msg.username === "System";
+
+  const usernameColor = isCurrentUser
+    ? "var(--primary)"
+    : isSystem
+    ? "var(--system-color)"
+    : getUsernameColor(displayName);
+
   return (
     <div
       className={`message-wrapper ${
-        msg.username === userName ? "message-right" : "message-left"
+        isCurrentUser ? "message-right" : "message-left"
       }`}
     >
       <div className="message-content">
-        {msg.username === "System" ? (
-          // System message divider
+        {isSystem ? (
           <div className="system-message-divider">
             <div className="divider-line"></div>
             <span>System</span>
@@ -386,29 +442,37 @@ function MessageBubble({ msg, userName }) {
 
         <div
           className={`message-bubble ${
-            msg.username === userName
+            isCurrentUser
               ? "user-message"
-              : msg.username === "System"
+              : isSystem
               ? "system-message"
               : "other-message"
           }`}
         >
-          {msg.username === "System" ? (
+          {isSystem ? (
             <div className="system-message-text">{msg.text}</div>
           ) : (
             <>
-              {msg.username !== userName && (
+              {!isCurrentUser && (
                 <div className="message-user-info">
-                  <div className="user-avatar">
-                    {msg.username.charAt(0).toUpperCase()}
+                  <div
+                    className="user-avatar"
+                    style={{ backgroundColor: usernameColor }}
+                  >
+                    {displayName.charAt(0).toUpperCase()}
                   </div>
-                  <span className="username-text">{msg.username}</span>
+                  <span
+                    className="username-text"
+                    style={{ color: usernameColor }}
+                  >
+                    {displayName}
+                  </span>
                 </div>
               )}
               <div className="message-text">{msg.text}</div>
               <div className="message-meta">
                 <span className="message-time">{msg.time}</span>
-                {msg.username === userName && (
+                {isCurrentUser && (
                   <span className="message-status">
                     <i className="bi bi-check2-all"></i>
                   </span>

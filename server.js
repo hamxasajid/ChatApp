@@ -7,7 +7,7 @@ const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
 
-// Allow CORS for all origins (frontend can connect)
+// Allow CORS for all origins
 app.use(cors());
 
 // Create socket.io instance
@@ -19,77 +19,82 @@ const io = new Server(server, {
 });
 
 const PORT = 5000;
-// Store online users
-let users = {};
+const activeUsers = new Map();
 
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.on("new user", (username) => {
-    // Check if username is already present among users
-    const isExistingUser = Object.values(users).includes(username);
+  // Handle new user connection
+  socket.on("new user", ({ requestedUsername }) => {
+    let finalUsername = requestedUsername;
+    let displayUsername = requestedUsername;
+    let counter = 1;
 
-    users[socket.id] = username; // Now save it AFTER checking
-
-    if (!isExistingUser) {
-      // New user
-      const welcomeMessage = {
-        username: "System",
-        text: `Welcome ${username} to the chat! 🎉`,
-        time: new Date().toLocaleTimeString(),
-      };
-      io.emit("chat message", welcomeMessage);
-    } else {
-      // Returning user (reconnect)
-      const joinMessage = {
-        username: "System",
-        text: `${username} has joined the chat.`,
-        time: new Date().toLocaleTimeString(),
-      };
-      io.emit("chat message", joinMessage);
+    // Ensure unique username
+    while (activeUsers.has(finalUsername)) {
+      finalUsername = `${requestedUsername}${counter}`;
+      displayUsername = `${requestedUsername}${counter}`;
+      counter++;
     }
+
+    // Store user information
+    activeUsers.set(finalUsername, socket.id);
+    socket.username = finalUsername;
+    socket.displayName = displayUsername;
+
+    // Send confirmation to client
+    socket.emit("username assigned", {
+      actualUsername: finalUsername,
+      displayUsername: displayUsername,
+    });
+
+    // Notify all users
+    io.emit("chat message", {
+      username: "System",
+      text: `${displayUsername} has joined the chat`,
+      time: new Date().toLocaleTimeString(),
+    });
   });
 
-  // Listen for normal chat messages
+  // Handle chat messages
   socket.on("chat message", (msg) => {
-    io.emit("chat message", msg);
+    const messageWithDisplayName = {
+      ...msg,
+      displayName: socket.displayName || msg.username,
+    };
+    io.emit("chat message", messageWithDisplayName);
   });
 
-  // Typing event (broadcast to others)
+  // Handle typing indicators
   socket.on("typing", (username) => {
-    socket.broadcast.emit("typing", username);
+    socket.broadcast.emit("typing", socket.displayName || username);
   });
 
-  // Stop typing event (broadcast to others)
   socket.on("stop typing", () => {
     socket.broadcast.emit("stop typing");
   });
 
-  // User leaving event
-  socket.on("user left", (username) => {
-    const leaveMessage = {
-      username: "System",
-      text: `${username} has left the chat.`,
-      time: new Date().toLocaleTimeString(),
-    };
-
-    io.emit("chat message", leaveMessage);
-    delete users[socket.id]; // Clean up
+  // Handle disconnection
+  socket.on("disconnect", () => {
+    if (socket.username) {
+      activeUsers.delete(socket.username);
+      io.emit("chat message", {
+        username: "System",
+        text: `${socket.displayName || socket.username} has left the chat`,
+        time: new Date().toLocaleTimeString(),
+      });
+    }
   });
 
-  socket.on("disconnect", () => {
-    console.log(`User disconnected: ${socket.id}`);
-
-    const username = users[socket.id];
-    if (username) {
-      const leaveMessage = {
+  // Optional: Explicit leave handling
+  socket.on("user left", () => {
+    if (socket.username) {
+      activeUsers.delete(socket.username);
+      io.emit("chat message", {
         username: "System",
-        text: `${username} has disconnected.`,
+        text: `${socket.displayName || socket.username} has left the chat`,
         time: new Date().toLocaleTimeString(),
-      };
-
-      io.emit("chat message", leaveMessage);
-      delete users[socket.id]; // Remove user from users list
+      });
     }
   });
 });
