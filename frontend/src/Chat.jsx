@@ -373,7 +373,9 @@ export default function Chat() {
                     searchDisabled={false}
                     skinTonesDisabled
                     lazyLoadEmojis
-                    style={{ backgroundColor: "var(--bgbubble)" }}
+                    style={{
+                      backgroundColor: "var(--bgbubble)",
+                    }}
                   />
                 </div>
               )}
