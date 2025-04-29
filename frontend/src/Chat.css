@@ -433,7 +433,7 @@
 .typing-indicator {
   margin-bottom: 12px;
   font-size: 0.85rem;
-  color: #666;
+  color: var(--darkmsgcolor);
   display: flex;
   align-items: center;
   gap: 8px;
